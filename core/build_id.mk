@@ -23,4 +23,4 @@
 # (like "TC1-RC5").  It must be a single word, and is
 # capitalized by convention.
 #
-export BUILD_ID=FRX00B
+export BUILD_ID=FRX01
