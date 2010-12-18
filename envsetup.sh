@@ -99,15 +99,27 @@ function setpaths()
     if [ -n $ANDROID_BUILD_PATHS ] ; then
         export PATH=${PATH/$ANDROID_BUILD_PATHS/}
     fi
+    if [ -n $ANDROID_PRE_BUILD_PATHS ] ; then
+        export PATH=${PATH/$ANDROID_PRE_BUILD_PATHS/}
+    fi
 
     # and in with the new
     CODE_REVIEWS=
     prebuiltdir=$(getprebuilt)
-    export ANDROID_EABI_TOOLCHAIN=$prebuiltdir/toolchain/arm-eabi-4.4.0/bin
+    export ANDROID_EABI_TOOLCHAIN=$prebuiltdir/toolchain/arm-eabi-4.4.3/bin
     export ANDROID_TOOLCHAIN=$ANDROID_EABI_TOOLCHAIN
     export ANDROID_QTOOLS=$T/development/emulator/qtools
     export ANDROID_BUILD_PATHS=:$(get_build_var ANDROID_BUILD_PATHS):$ANDROID_QTOOLS:$ANDROID_TOOLCHAIN:$ANDROID_EABI_TOOLCHAIN$CODE_REVIEWS
     export PATH=$PATH$ANDROID_BUILD_PATHS
+
+    unset ANDROID_JAVA_TOOLCHAIN
+    if [ -n "$JAVA_HOME" ]; then
+        export ANDROID_JAVA_TOOLCHAIN=$JAVA_HOME/bin
+    fi
+    export ANDROID_PRE_BUILD_PATHS=$ANDROID_JAVA_TOOLCHAIN
+    if [ -n "$ANDROID_PRE_BUILD_PATHS" ]; then
+        export PATH=$ANDROID_PRE_BUILD_PATHS:$PATH
+    fi
 
     unset ANDROID_PRODUCT_OUT
     export ANDROID_PRODUCT_OUT=$(get_abs_build_var PRODUCT_OUT)
@@ -134,18 +146,16 @@ function printconfig()
 function set_stuff_for_environment()
 {
     settitle
+    set_java_home
     setpaths
     set_sequence_number
-
-    # Don't try to do preoptimization until it works better on OSX.
-    export DISABLE_DEXPREOPT=true
 
     export ANDROID_BUILD_TOP=$(gettop)
 }
 
 function set_sequence_number()
 {
-    export BUILD_ENV_SEQUENCE_NUMBER=9
+    export BUILD_ENV_SEQUENCE_NUMBER=10
 }
 
 function settitle()
@@ -653,7 +663,7 @@ function mmm()
         for DIR in $DIRS ; do
             DIR=`echo $DIR | sed -e 's:/$::'`
             if [ -f $DIR/Android.mk ]; then
-                TO_CHOP=`echo $T | wc -c | tr -d ' '`
+                TO_CHOP=`(cd -P -- $T && pwd -P) | wc -c | tr -d ' '`
                 TO_CHOP=`expr $TO_CHOP + 1`
                 START=`PWD= /bin/pwd`
                 MFILE=`echo $START | cut -c${TO_CHOP}-`
@@ -1058,19 +1068,19 @@ function godir () {
     cd $T/$pathname
 }
 
-# Force JAVA_HOME to point to java 1.5 if it isn't already set
-if [ "$STAY_OFF_MY_LAWN" = "" ]; then
+# Force JAVA_HOME to point to java 1.6 if it isn't already set
+function set_java_home() {
     if [ ! "$JAVA_HOME" ]; then
         case `uname -s` in
             Darwin)
-                export JAVA_HOME=/System/Library/Frameworks/JavaVM.framework/Versions/1.5/Home
+                export JAVA_HOME=/System/Library/Frameworks/JavaVM.framework/Versions/1.6/Home
                 ;;
             *)
-                export JAVA_HOME=/usr/lib/jvm/java-1.5.0-sun
+                export JAVA_HOME=/usr/lib/jvm/java-6-sun
                 ;;
         esac
     fi
-fi
+}
 
 # determine whether arrays are zero-based (bash) or one-based (zsh)
 _xarray=(a b c)

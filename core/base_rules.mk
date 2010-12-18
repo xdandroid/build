@@ -69,6 +69,36 @@ ifneq ($(filter-out user debug eng tests optional samples,$(LOCAL_MODULE_TAGS)),
 $(warning unusual tags $(LOCAL_MODULE_TAGS) on $(LOCAL_MODULE) at $(LOCAL_PATH))
 endif
 
+ifneq ($(filter $(LOCAL_MODULE_TAGS),user),)
+  ifeq ($(filter $(GRANDFATHERED_USER_MODULES),$(LOCAL_MODULE)),)
+    $(warning *** Module name: $(LOCAL_MODULE))
+    $(warning *** Makefile location: $(LOCAL_PATH))
+    $(warning * )
+    $(warning * Each module must use a LOCAL_MODULE_TAGS in its)
+    $(warning * Android.mk. Possible tags declared by a module:)
+    $(warning * )
+    $(warning *     optional, debug, eng, tests, samples)
+    $(warning * )
+    $(warning * If the module is expected to be in all builds)
+    $(warning * of a product, then it should use the)
+    $(warning * "optional" tag: )
+    $(warning * )
+    $(warning *    Add "LOCAL_MODULE_TAGS := optional" in the)
+    $(warning *    Android.mk for the affected module, and add)
+    $(warning *    the LOCAL_MODULE value for that component)
+    $(warning *    into the PRODUCT_PACKAGES section of product)
+    $(warning *    makefile(s) where it's necessary, if)
+    $(warning *    appropriate.)
+    $(warning * )
+    $(warning * If the component should be in EVERY build of ALL)
+    $(warning * products, then add its LOCAL_MODULE value to the)
+    $(warning * PRODUCT_PACKAGES section of)
+    $(warning * build/target/product/core.mk)
+    $(warning * )
+    $(error user tag detected on new module - user tags are only supported on legacy modules)
+  endif
+endif
+
 # Add implicit tags.
 #
 # If the local directory or one of its parents contains a MODULE_LICENSE_GPL
@@ -222,7 +252,7 @@ ifneq ($(strip $(filter $(LOCAL_MODULE_CLASS),APPS JAVA_LIBRARIES)),)
 logtags_java_sources := $(patsubst %.logtags,%.java,$(addprefix $(intermediates.COMMON)/src/, $(logtags_sources)))
 logtags_sources := $(addprefix $(TOP_DIR)$(LOCAL_PATH)/, $(logtags_sources))
 
-$(logtags_java_sources): $(intermediates.COMMON)/src/%.java: $(TOPDIR)$(LOCAL_PATH)/%.logtags $(TARGET_OUT)/etc/event-log-tags
+$(logtags_java_sources): $(intermediates.COMMON)/src/%.java: $(TOPDIR)$(LOCAL_PATH)/%.logtags $(TARGET_OUT_COMMON_INTERMEDIATES)/all-event-log-tags.txt
 	$(transform-logtags-to-java)
 
 endif
@@ -312,7 +342,7 @@ ifneq ($(strip $(all_java_sources)$(all_res_assets)),)
 full_static_java_libs := \
     $(foreach lib,$(LOCAL_STATIC_JAVA_LIBRARIES), \
       $(call intermediates-dir-for, \
-        JAVA_LIBRARIES,$(lib),$(LOCAL_IS_HOST_MODULE))/javalib.jar)
+        JAVA_LIBRARIES,$(lib),$(LOCAL_IS_HOST_MODULE),COMMON)/javalib.jar)
 
 $(LOCAL_INTERMEDIATE_TARGETS): PRIVATE_INSTALL_DIR := $(dir $(LOCAL_INSTALLED_MODULE))
 $(LOCAL_INTERMEDIATE_TARGETS): PRIVATE_CLASS_INTERMEDIATES_DIR := $(intermediates)/classes
@@ -343,23 +373,16 @@ $(LOCAL_INTERMEDIATE_TARGETS): PRIVATE_STATIC_JAVA_LIBRARIES := $(full_static_ja
 ifdef LOCAL_IS_HOST_MODULE
 # TODO: make prebuilt java libraries use the same
 #       intermediates path pattern as target java libraries.
+ifeq ($(LOCAL_BUILD_HOST_DEX),true)
+full_java_libs := $(call java-lib-files,$(LOCAL_JAVA_LIBRARIES),$(LOCAL_IS_HOST_MODULE))
+full_java_lib_deps := $(call java-lib-deps,$(LOCAL_JAVA_LIBRARIES),$(LOCAL_IS_HOST_MODULE))
+else
 full_java_libs := $(addprefix $(HOST_OUT_JAVA_LIBRARIES)/,$(addsuffix $(COMMON_JAVA_PACKAGE_SUFFIX),$(LOCAL_JAVA_LIBRARIES)))
 full_java_lib_deps := $(full_java_libs)
-else
-ifdef LOCAL_SDK_VERSION
-ifneq ($(LOCAL_SDK_VERSION),current)
-full_java_libs := $(call java-lib-files,$(LOCAL_JAVA_LIBRARIES),$(LOCAL_IS_HOST_MODULE))
-# For prebuilt sdk versions, we can't depend on the javalib.jar but classes.jar.
-full_java_lib_deps := $(call java-lib-deps,$(filter-out sdk_v$(LOCAL_SDK_VERSION),$(LOCAL_JAVA_LIBRARIES)),$(LOCAL_IS_HOST_MODULE))
-full_java_lib_deps += $(call java-lib-files,sdk_v$(LOCAL_SDK_VERSION),$(LOCAL_IS_HOST_MODULE))
+endif # LOCAL_BUILD_HOST_DEX
 else
 full_java_libs := $(call java-lib-files,$(LOCAL_JAVA_LIBRARIES),$(LOCAL_IS_HOST_MODULE))
 full_java_lib_deps := $(call java-lib-deps,$(LOCAL_JAVA_LIBRARIES),$(LOCAL_IS_HOST_MODULE))
-endif # !current
-else
-full_java_libs := $(call java-lib-files,$(LOCAL_JAVA_LIBRARIES),$(LOCAL_IS_HOST_MODULE))
-full_java_lib_deps := $(call java-lib-deps,$(LOCAL_JAVA_LIBRARIES),$(LOCAL_IS_HOST_MODULE))
-endif # LOCAL_SDK_VERSION
 endif # !LOCAL_IS_HOST_MODULE
 full_java_libs += $(full_static_java_libs) $(LOCAL_CLASSPATH)
 full_java_lib_deps += $(full_static_java_libs) $(LOCAL_CLASSPATH)
@@ -380,11 +403,8 @@ ifdef LOCAL_INSTRUMENTATION_FOR
       APPS,$(LOCAL_INSTRUMENTATION_FOR),,COMMON)
 
   # link against the jar with full original names (before proguard processing).
-  full_java_libs += $(link_instr_intermediates_dir.COMMON)/classes-full-names.jar
-
-  # We can't depend on the .jar file, so we depend on something that
-  # depends on the jar file; the final built package file.
-  full_java_lib_deps += $(link_instr_intermediates_dir)/package.apk
+  full_java_libs += $(link_instr_intermediates_dir.COMMON)/classes.jar
+  full_java_lib_deps += $(link_instr_intermediates_dir.COMMON)/classes.jar
 endif
 
 ifneq ($(strip $(LOCAL_JAR_MANIFEST)),)
@@ -420,7 +440,7 @@ $(LOCAL_INTERMEDIATE_TARGETS) : PRIVATE_POST_PROCESS_COMMAND:= $(LOCAL_POST_PROC
 $(LOCAL_INTERMEDIATE_TARGETS) : PRIVATE_AAPT_FLAGS:= $(LOCAL_AAPT_FLAGS)
 $(LOCAL_INTERMEDIATE_TARGETS) : PRIVATE_JAVA_LIBRARIES:= $(LOCAL_JAVA_LIBRARIES)
 $(LOCAL_INTERMEDIATE_TARGETS) : PRIVATE_MANIFEST_PACKAGE_NAME:= $(LOCAL_MANIFEST_PACKAGE_NAME)
-$(LOCAL_INTERMEDIATE_TARGETS) : PRIVATE_INSTRUMENTATION_FOR_PACKAGE_NAME:= $(LOCAL_INSTRUMENTATION_FOR_PACKAGE_NAME)
+$(LOCAL_INTERMEDIATE_TARGETS) : PRIVATE_MANIFEST_INSTRUMENTATION_FOR:= $(LOCAL_MANIFEST_INSTRUMENTATION_FOR)
 
 $(LOCAL_INTERMEDIATE_TARGETS) : PRIVATE_ALL_JAVA_LIBRARIES:= $(full_java_libs)
 $(LOCAL_INTERMEDIATE_TARGETS) : PRIVATE_IS_HOST_MODULE := $(LOCAL_IS_HOST_MODULE)
@@ -458,6 +478,16 @@ else
 $(LOCAL_INSTALLED_MODULE): $(LOCAL_BUILT_MODULE)
 	@echo "Install: $@"
 	$(copy-file-to-target-with-cp)
+endif
+
+ifeq ($(LOCAL_DEX_PREOPT),true)
+installed_odex := $(basename $(LOCAL_INSTALLED_MODULE)).odex
+built_odex := $(basename $(LOCAL_BUILT_MODULE)).odex
+$(installed_odex) : $(built_odex) | $(ACP)
+	@echo "Install: $@"
+	$(copy-file-to-target)
+
+$(LOCAL_INSTALLED_MODULE) : | $(installed_odex)
 endif
 
 endif # !LOCAL_UNINSTALLABLE_MODULE
@@ -507,6 +537,10 @@ ALL_MODULES.$(LOCAL_MODULE).REQUIRED := \
     $(ALL_MODULES.$(LOCAL_MODULE).REQUIRED) $(LOCAL_REQUIRED_MODULES)
 ALL_MODULES.$(LOCAL_MODULE).EVENT_LOG_TAGS := \
     $(ALL_MODULES.$(LOCAL_MODULE).EVENT_LOG_TAGS) $(event_log_tags)
+ALL_MODULES.$(LOCAL_MODULE).INTERMEDIATE_SOURCE_DIR := \
+    $(ALL_MODULES.$(LOCAL_MODULE).INTERMEDIATE_SOURCE_DIR) $(LOCAL_INTERMEDIATE_SOURCE_DIR)
+
+INSTALLABLE_FILES.$(LOCAL_INSTALLED_MODULE).MODULE := $(LOCAL_MODULE)
 
 ###########################################################
 ## Take care of LOCAL_MODULE_TAGS

@@ -17,6 +17,28 @@
 # Configuration for Darwin (Mac OS X) on x86.
 # Included by combo/select.mk
 
+# We build everything in 32-bit, because some host tools are
+# 32-bit-only anyway (emulator, acc), and because it gives us
+# more consistency between the host tools and the target.
+HOST_GLOBAL_CFLAGS += -m32
+HOST_GLOBAL_LDFLAGS += -m32
+
+# Use the Mac OSX SDK 10.5 if the build host is 10.6
+build_mac_version := $(shell sw_vers -productVersion)
+ifneq ($(filter 10.6.%, $(build_mac_version)),)
+sdk_105_root := /Developer/SDKs/MacOSX10.5.sdk
+ifeq ($(wildcard $(sdk_105_root)),)
+$(warning *****************************************************)
+$(warning * You are building on Mac OSX 10.6.)
+$(warning * Can not find SDK 10.5 at $(sdk_105_root))
+$(warning *****************************************************)
+$(error Stop.)
+endif
+
+HOST_GLOBAL_CFLAGS += -isysroot $(sdk_105_root) -mmacosx-version-min=10.5
+HOST_GLOBAL_LDFLAGS += -isysroot $(sdk_105_root) -mmacosx-version-min=10.5
+endif # build_mac_version is 10.6
+
 HOST_GLOBAL_CFLAGS += -fPIC
 HOST_NO_UNDEFINED_LDFLAGS := -Wl,-undefined,error
 
@@ -38,6 +60,7 @@ define transform-host-o-to-shared-lib-inner
     $(HOST_CXX) \
         -dynamiclib -single_module -read_only_relocs suppress \
         $(HOST_GLOBAL_LD_DIRS) \
+        $(HOST_GLOBAL_LDFLAGS) \
         $(PRIVATE_ALL_OBJECTS) \
         $(call normalize-target-libraries,$(PRIVATE_ALL_SHARED_LIBRARIES)) \
         $(call normalize-target-libraries,$(PRIVATE_ALL_WHOLE_STATIC_LIBRARIES)) \
@@ -53,6 +76,7 @@ $(HOST_CXX) \
         -o $@ \
         -Wl,-dynamic -headerpad_max_install_names \
         $(HOST_GLOBAL_LD_DIRS) \
+        $(HOST_GLOBAL_LDFLAGS) \
         $(call normalize-target-libraries,$(PRIVATE_ALL_SHARED_LIBRARIES)) \
         $(PRIVATE_ALL_OBJECTS) \
         $(call normalize-target-libraries,$(PRIVATE_ALL_WHOLE_STATIC_LIBRARIES)) \

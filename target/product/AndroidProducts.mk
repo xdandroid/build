@@ -34,6 +34,7 @@ else
 PRODUCT_MAKEFILES := \
     $(LOCAL_DIR)/core.mk \
     $(LOCAL_DIR)/generic.mk \
+    $(LOCAL_DIR)/generic_x86.mk \
     $(LOCAL_DIR)/full.mk \
     $(LOCAL_DIR)/sdk.mk \
     $(LOCAL_DIR)/sim.mk

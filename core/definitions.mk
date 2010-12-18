@@ -381,7 +381,7 @@ $(strip \
     $(if $(_idfName),, \
         $(error $(LOCAL_PATH): Name not defined in call to intermediates-dir-for)) \
     $(eval _idfPrefix := $(if $(strip $(3)),HOST,TARGET)) \
-    $(if $(filter $(_idfClass),$(COMMON_MODULE_CLASSES))$(4), \
+    $(if $(filter $(_idfPrefix)-$(_idfClass),$(COMMON_MODULE_CLASSES))$(4), \
         $(eval _idfIntBase := $($(_idfPrefix)_OUT_COMMON_INTERMEDIATES)) \
       , \
         $(eval _idfIntBase := $($(_idfPrefix)_OUT_INTERMEDIATES)) \
@@ -473,8 +473,7 @@ endef
 
 
 ###########################################################
-## Convert "framework framework-res ext" to "out/.../javalib.jar ..."
-## This lets us treat framework-res as a normal library.
+## Convert "core ext framework" to "out/.../javalib.jar ..."
 ## $(1): library list
 ## $(2): Non-empty if IS_HOST_MODULE
 ###########################################################
@@ -483,18 +482,13 @@ endef
 # $(2): Non-empty if IS_HOST_MODULE
 define _java-lib-dir
 $(call intermediates-dir-for, \
-	$(if $(filter framework-res,$(1)),APPS,JAVA_LIBRARIES),$(1),$(2))
-endef
-
-# $(1): library name
-define _java-lib-classes.jar
-$(if $(filter framework-res,$(1)),package$(COMMON_ANDROID_PACKAGE_SUFFIX),classes$(COMMON_JAVA_PACKAGE_SUFFIX))
+	JAVA_LIBRARIES,$(1),$(2),COMMON)
 endef
 
 # $(1): library name
 # $(2): Non-empty if IS_HOST_MODULE
 define _java-lib-full-classes.jar
-$(call _java-lib-dir,$(1),$(2))/$(call _java-lib-classes.jar,$(1))
+$(call _java-lib-dir,$(1),$(2))/classes$(COMMON_JAVA_PACKAGE_SUFFIX)
 endef
 
 # $(1): library name list
@@ -504,14 +498,9 @@ $(foreach lib,$(1),$(call _java-lib-full-classes.jar,$(lib),$(2)))
 endef
 
 # $(1): library name
-define _java-lib-dep
-$(if $(filter framework-res,$(1)),package$(COMMON_ANDROID_PACKAGE_SUFFIX),javalib$(COMMON_JAVA_PACKAGE_SUFFIX))
-endef
-
-# $(1): library name
 # $(2): Non-empty if IS_HOST_MODULE
 define _java-lib-full-dep
-$(call _java-lib-dir,$(1),$(2))/$(call _java-lib-dep,$(1))
+$(call _java-lib-dir,$(1),$(2))/javalib$(COMMON_JAVA_PACKAGE_SUFFIX)
 endef
 
 # $(1): library name list
@@ -949,7 +938,7 @@ endef
 
 define extract-and-include-target-whole-static-libs
 $(foreach lib,$(PRIVATE_ALL_WHOLE_STATIC_LIBRARIES), \
-	@echo "preparing StaticLib: $(PRIVATE_MODULE) [including $(lib)]"; \
+	$(hide) echo "preparing StaticLib: $(PRIVATE_MODULE) [including $(lib)]"; \
 	ldir=$(PRIVATE_INTERMEDIATES_DIR)/WHOLE/$(basename $(notdir $(lib)))_objs;\
 	rm -rf $$ldir; \
 	mkdir -p $$ldir; \
@@ -969,7 +958,8 @@ define transform-o-to-static-lib
 @rm -f $@
 $(extract-and-include-target-whole-static-libs)
 @echo "target StaticLib: $(PRIVATE_MODULE) ($@)"
-$(hide) echo $^ | xargs $(TARGET_AR) $(TARGET_GLOBAL_ARFLAGS) $(PRIVATE_ARFLAGS) $@
+$(hide) echo $(filter %.o, $^) | \
+    xargs $(TARGET_AR) $(TARGET_GLOBAL_ARFLAGS) $(PRIVATE_ARFLAGS) $@
 endef
 
 ###########################################################
@@ -1235,7 +1225,7 @@ $(hide) $(AAPT) package $(PRIVATE_AAPT_FLAGS) -m \
     $(if $(filter --version-code,$(PRIVATE_AAPT_FLAGS)),,$(addprefix --version-code , $(PLATFORM_SDK_VERSION))) \
     $(if $(filter --version-name,$(PRIVATE_AAPT_FLAGS)),,$(addprefix --version-name , $(PLATFORM_VERSION))) \
     $(addprefix --rename-manifest-package , $(PRIVATE_MANIFEST_PACKAGE_NAME)) \
-    $(addprefix --rename-instrumentation-target-package , $(PRIVATE_INSTRUMENTATION_FOR_PACKAGE_NAME))
+    $(addprefix --rename-instrumentation-target-package , $(PRIVATE_MANIFEST_INSTRUMENTATION_FOR))
 endef
 
 ifeq ($(HOST_OS),windows)
@@ -1325,7 +1315,8 @@ endef
 
 define transform-classes.jar-to-emma
 $(hide) java -classpath $(EMMA_JAR) emma instr -outmode fullcopy -outfile \
-    $(PRIVATE_EMMA_COVERAGE_FILE) -ip $< -d $(PRIVATE_EMMA_INTERMEDIATES_DIR)
+    $(PRIVATE_EMMA_COVERAGE_FILE) -ip $< -d $(PRIVATE_EMMA_INTERMEDIATES_DIR) \
+    $(addprefix -ix , $(PRIVATE_EMMA_COVERAGE_FILTER))
 endef
 
 #TODO: use a smaller -Xmx value for most libraries;
@@ -1376,26 +1367,30 @@ $(hide) $(AAPT) package -u $(PRIVATE_AAPT_FLAGS) \
     $(addprefix -I , $(PRIVATE_AAPT_INCLUDES)) \
     $(addprefix --min-sdk-version , $(DEFAULT_APP_TARGET_SDK)) \
     $(addprefix --target-sdk-version , $(DEFAULT_APP_TARGET_SDK)) \
+    $(addprefix --product , $(TARGET_AAPT_CHARACTERISTICS)) \
     $(if $(filter --version-code,$(PRIVATE_AAPT_FLAGS)),,$(addprefix --version-code , $(PLATFORM_SDK_VERSION))) \
     $(if $(filter --version-name,$(PRIVATE_AAPT_FLAGS)),,$(addprefix --version-name , $(PLATFORM_VERSION))) \
     $(addprefix --rename-manifest-package , $(PRIVATE_MANIFEST_PACKAGE_NAME)) \
-    $(addprefix --rename-instrumentation-target-package , $(PRIVATE_INSTRUMENTATION_FOR_PACKAGE_NAME)) \
+    $(addprefix --rename-instrumentation-target-package , $(PRIVATE_MANIFEST_INSTRUMENTATION_FOR)) \
     -F $@
 endef
 
-#TODO: Allow library directory to be specified based on the target
-#      CPU and ABI instead of being hard coded as armeabi.
 define add-jni-shared-libs-to-package
 $(hide) rm -rf $(dir $@)lib
-$(hide) mkdir -p $(dir $@)lib/armeabi
-$(hide) cp $(PRIVATE_JNI_SHARED_LIBRARIES) $(dir $@)lib/armeabi
+$(hide) mkdir -p $(dir $@)lib/$(TARGET_CPU_ABI)
+$(hide) cp $(PRIVATE_JNI_SHARED_LIBRARIES) $(dir $@)lib/$(TARGET_CPU_ABI)
 $(hide) (cd $(dir $@) && zip -r $(notdir $@) lib)
 $(hide) rm -rf $(dir $@)lib
 endef
 
 #TODO: update the manifest to point to the dex file
 define add-dex-to-package
-$(hide) $(AAPT) add -k $@ $(PRIVATE_DEX_FILE)
+$(if $(filter classes.dex,$(notdir $(PRIVATE_DEX_FILE))),\
+$(hide) $(AAPT) add -k $@ $(PRIVATE_DEX_FILE),\
+$(eval _adtp_classes.dex := $(dir $(PRIVATE_DEX_FILE))/classes.dex)\
+$(hide) cp $(PRIVATE_DEX_FILE) $(_adtp_classes.dex) && \
+$(AAPT) add -k $@ $(_adtp_classes.dex) && \
+rm -f $(_adtp_classes.dex))
 endef
 
 define add-java-resources-to-package
@@ -1743,20 +1738,21 @@ endef
 #        tree root)
 #  $(2): Old LOCAL_PACKAGE_NAME value.
 #  $(3): New LOCAL_PACKAGE_NAME value.
-#  $(4): New LOCALE_MANIFEST_PACKAGE_NAME value.
-#  $(5): New LOCAL_INSTRUMENTATION_FOR_PACKAGE_NAME value.
-#  $(6): New LOCAL_CERTIFICATE value.
+#  $(4): New LOCAL_MANIFEST_PACKAGE_NAME value.
+#  $(5): New LOCAL_CERTIFICATE value.
+#  $(6): New LOCAL_INSTRUMENTATION_FOR value.
+#  $(7): New LOCAL_MANIFEST_INSTRUMENTATION_FOR value.
 #
 # Note that LOCAL_PACKAGE_OVERRIDES is NOT cleared in
 # clear_vars.mk.
 ###########################################################
 define inherit-package
-  $(eval $(call inherit-package-internal,$(1),$(2),$(3),$(4),$(5),$(6)))
+  $(eval $(call inherit-package-internal,$(1),$(2),$(3),$(4),$(5),$(6),$(7)))
 endef
 
 define inherit-package-internal
   LOCAL_PACKAGE_OVERRIDES \
-      := $(strip $(1))||$(strip $(2))||$(strip $(3))||$(strip $(4))||&&$(strip $(5))||$(strip $(6)) $(LOCAL_PACKAGE_OVERRIDES)
+      := $(strip $(1))||$(strip $(2))||$(strip $(3))||$(strip $(4))||&&$(strip $(5))||&&$(strip $(6))||&&$(strip $(7)) $(LOCAL_PACKAGE_OVERRIDES)
   include $(1)
   LOCAL_PACKAGE_OVERRIDES \
       := $(wordlist 1,$(words $(LOCAL_PACKAGE_OVERRIDES)), $(LOCAL_PACKAGE_OVERRIDES))
@@ -1778,8 +1774,9 @@ define set-inherited-package-variables-internal
   $(if $(filter $(word 2,$(_n)),$(LOCAL_PACKAGE_NAME)), \
     $(eval LOCAL_PACKAGE_NAME := $(word 3,$(_o))) \
     $(eval LOCAL_MANIFEST_PACKAGE_NAME := $(word 4,$(_o))) \
-    $(call keep-or-override,LOCAL_INSTRUMENTATION_FOR_PACKAGE_NAME,$(patsubst &&%,%,$(word 5,$(_o)))) \
-    $(call keep-or-override,LOCAL_CERTIFICATE,$(word 6,$(_o))) \
+    $(call keep-or-override,LOCAL_CERTIFICATE,$(patsubst &&%,%,$(word 5,$(_o)))) \
+    $(call keep-or-override,LOCAL_INSTRUMENTATION_FOR,$(patsubst &&%,%,$(word 6,$(_o)))) \
+    $(call keep-or-override,LOCAL_MANIFEST_INSTRUMENTATION_FOR,$(patsubst &&%,%,$(word 7,$(_o)))) \
     $(eval LOCAL_OVERRIDES_PACKAGES := $(sort $(LOCAL_OVERRIDES_PACKAGES) $(word 2,$(_o)))) \
     true \
   ,)
@@ -1795,6 +1792,9 @@ endef
 # when requested.
 include $(BUILD_SYSTEM)/distdir.mk
 
+# -----------------------------------------------------------------
+# The modules allowed to use a user tag
+include $(BUILD_SYSTEM)/user_tags.mk
 
 # broken:
 #	$(foreach file,$^,$(if $(findstring,.a,$(suffix $file)),-l$(file),$(file)))

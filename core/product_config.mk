@@ -119,12 +119,16 @@ ifdef product_goals
     default_goal_substitution := $(DEFAULT_GOAL)
   endif
 
-  # Hack to make the linux build servers use dexpreopt.
-  # OSX is still a little flaky.  Most engineers don't use this
-  # type of target ("make PRODUCT-blah-user"), so this should
-  # only tend to happen when using buildbot.
-  # TODO: remove this and fix the matching lines in build/core/main.mk
-  # once dexpreopt works better on OSX.
+  # For tests build, only build tests-build-target
+  ifeq (tests,$(TARGET_BUILD_VARIANT))
+    default_goal_substitution := tests-build-target
+  endif
+
+  # Hack to make the linux build servers use dexpreopt (emulator-based
+  # preoptimization). Most engineers don't use this type of target
+  # ("make PRODUCT-blah-user"), so this should only tend to happen when
+  # using buildbot.
+  # TODO: Remove this once host Dalvik preoptimization is working.
   ifeq ($(TARGET_BUILD_VARIANT),user)
     WITH_DEXPREOPT_buildbot := true
   endif
@@ -249,11 +253,14 @@ ifndef PRODUCT_MANUFACTURER
   PRODUCT_MANUFACTURER := unknown
 endif
 
+ifeq ($(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_CHARACTERISTICS),)
+  TARGET_AAPT_CHARACTERISTICS := default
+else
+  TARGET_AAPT_CHARACTERISTICS := $(strip $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_CHARACTERISTICS))
+endif
+
 PRODUCT_DEFAULT_WIFI_CHANNELS := \
 	$(strip $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_DEFAULT_WIFI_CHANNELS))
-
-# Which policy should this product use
-PRODUCT_POLICY := $(strip $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_POLICY))
 
 # A list of words like <source path>:<destination path>.  The file at
 # the source path should be copied to the destination path when building

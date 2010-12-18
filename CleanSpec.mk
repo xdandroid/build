@@ -44,6 +44,15 @@
 #$(call add-clean-step, find $(OUT_DIR) -type f -name "IGTalkSession*" -print0 | xargs -0 rm -f)
 #$(call add-clean-step, rm -rf $(PRODUCT_OUT)/data/*)
 
-# ************************************************
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/obj/SHARED_LIBRARIES/libmediaplayerservice_intermediates)
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/obj/SHARED_LIBRARIES/libmedia_jni_intermediates)
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/obj/SHARED_LIBRARIES/libstagefright_omx_intermediates)
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/build.prop)
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/vendor)
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/android-info.txt)
+$(call add-clean-step, find $(PRODUCT_OUT) -name "*.apk" | xargs rm)
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/obj/APPS/*)
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/build.prop)
+
 # NEWER CLEAN STEPS MUST BE AT THE END OF THE LIST
 # ************************************************

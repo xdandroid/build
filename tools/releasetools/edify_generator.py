@@ -21,16 +21,17 @@ class EdifyGenerator(object):
   """Class to generate scripts in the 'edify' recovery script language
   used from donut onwards."""
 
-  def __init__(self, version):
+  def __init__(self, version, info):
     self.script = []
     self.mounts = set()
     self.version = version
+    self.info = info
 
   def MakeTemporary(self):
     """Make a temporary script object whose commands can latter be
     appended to the parent script with AppendScript().  Used when the
     caller wants to generate script commands out-of-order."""
-    x = EdifyGenerator(self.version)
+    x = EdifyGenerator(self.version, self.info)
     x.mounts = self.mounts
     return x
 
@@ -130,12 +131,22 @@ class EdifyGenerator(object):
     available on /cache."""
     self.script.append("assert(apply_patch_space(%d));" % (amount,))
 
-  def Mount(self, kind, what, path):
-    """Mount the given 'what' at the given path.  'what' should be a
-    partition name if kind is "MTD", or a block device if kind is
-    "vfat".  No other values of 'kind' are supported."""
-    self.script.append('mount("%s", "%s", "%s");' % (kind, what, path))
-    self.mounts.add(path)
+  def Mount(self, mount_point):
+    """Mount the partition with the given mount_point."""
+    fstab = self.info.get("fstab", None)
+    if fstab:
+      p = fstab[mount_point]
+      self.script.append('mount("%s", "%s", "%s", "%s");' %
+                         (p.fs_type, common.PARTITION_TYPES[p.fs_type],
+                          p.device, p.mount_point))
+      self.mounts.add(p.mount_point)
+    else:
+      what = mount_point.lstrip("/")
+      what = self.info.get("partition_path", "") + what
+      self.script.append('mount("%s", "%s", "%s", "%s");' %
+                         (self.info["fs_type"], self.info["partition_type"],
+                          what, mount_point))
+      self.mounts.add(mount_point)
 
   def UnpackPackageDir(self, src, dst):
     """Unpack a given directory from the OTA package into the given
@@ -154,8 +165,20 @@ class EdifyGenerator(object):
     self.script.append('ui_print("%s");' % (message,))
 
   def FormatPartition(self, partition):
-    """Format the given MTD partition."""
-    self.script.append('format("MTD", "%s");' % (partition,))
+    """Format the given partition, specified by its mount point (eg,
+    "/system")."""
+
+    fstab = self.info.get("fstab", None)
+    if fstab:
+      p = fstab[partition]
+      self.script.append('format("%s", "%s", "%s");' %
+                         (p.fs_type, common.PARTITION_TYPES[p.fs_type], p.device))
+    else:
+      # older target-files without per-partition types
+      partition = self.info.get("partition_path", "") + partition
+      self.script.append('format("%s", "%s", "%s");' %
+                         (self.info["fs_type"], self.info["partition_type"],
+                          partition))
 
   def DeleteFiles(self, file_list):
     """Delete all files in file_list."""
@@ -189,13 +212,42 @@ class EdifyGenerator(object):
       self.script.append(
           'write_firmware_image("PACKAGE:%s", "%s");' % (fn, kind))
 
-  def WriteRawImage(self, partition, fn):
-    """Write the given package file into the given MTD partition."""
-    self.script.append(
-        ('assert(package_extract_file("%(fn)s", "/tmp/%(partition)s.img"),\n'
-         '       write_raw_image("/tmp/%(partition)s.img", "%(partition)s"),\n'
-         '       delete("/tmp/%(partition)s.img"));')
-        % {'partition': partition, 'fn': fn})
+  def WriteRawImage(self, mount_point, fn):
+    """Write the given package file into the partition for the given
+    mount point."""
+
+    fstab = self.info["fstab"]
+    if fstab:
+      p = fstab[mount_point]
+      partition_type = common.PARTITION_TYPES[p.fs_type]
+      args = {'device': p.device, 'fn': fn}
+      if partition_type == "MTD":
+        self.script.append(
+            ('assert(package_extract_file("%(fn)s", "/tmp/%(device)s.img"),\n'
+             '       write_raw_image("/tmp/%(device)s.img", "%(device)s"),\n'
+             '       delete("/tmp/%(device)s.img"));') % args)
+      elif partition_type == "EMMC":
+        self.script.append(
+            'package_extract_file("%(fn)s", "%(device)s");' % args)
+      else:
+        raise ValueError("don't know how to write \"%s\" partitions" % (p.fs_type,))
+    else:
+      # backward compatibility with older target-files that lack recovery.fstab
+      if self.info["partition_type"] == "MTD":
+        self.script.append(
+            ('assert(package_extract_file("%(fn)s", "/tmp/%(partition)s.img"),\n'
+             '       write_raw_image("/tmp/%(partition)s.img", "%(partition)s"),\n'
+             '       delete("/tmp/%(partition)s.img"));')
+            % {'partition': partition, 'fn': fn})
+      elif self.info["partition_type"] == "EMMC":
+        self.script.append(
+            ('package_extract_file("%(fn)s", "%(dir)s%(partition)s");')
+            % {'partition': partition, 'fn': fn,
+               'dir': self.info.get("partition_path", ""),
+               })
+      else:
+        raise ValueError("don't know how to write \"%s\" partitions" %
+                         (self.info["partition_type"],))
 
   def SetPermissions(self, fn, uid, gid, mode):
     """Set file ownership and permissions."""

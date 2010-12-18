@@ -34,10 +34,6 @@
   font-size:12px;
 }
 
-#side-nav.not-resizable {
-  background:url('images/sidenav-rule.png') no-repeat 243px 0;
-}
-
 #resize-packages-nav {
 /* keeps the resize handle below the h-scroll handle */
   height:270px;
@@ -943,7 +939,7 @@ p.table-caption {
 }
 
 .sidebox p {
-  margin-bottom: .25em;
+  margin-bottom: .75em;
 }
 
 .sidebox ul {
@@ -1054,7 +1050,7 @@ ol.toc li ol {
   margin: 0;
   padding: 0;
 }
-  
+
 ol.toc li li {
   padding: 0;
   margin: 0 0 0 1em;
@@ -1181,6 +1177,76 @@ table.download th {
   float: right;
 }
 
+/* 200px */
+.g-tpl-200 .g-unit,
+.g-unit .g-tpl-200 .g-unit,
+.g-unit .g-unit .g-tpl-200 .g-unit {
+  display: block;
+  margin: 0 0 0 200px;
+  width: auto;
+  float: none;
+}
+.g-unit .g-unit .g-tpl-200 .g-first,
+.g-unit .g-tpl-200 .g-first,
+.g-tpl-200 .g-first {
+  display: block;
+  margin: 0;
+  width: 200px;
+  float: left;
+}
+/* 200px alt */
+.g-tpl-200-alt .g-unit,
+.g-unit .g-tpl-200-alt .g-unit,
+.g-unit .g-unit .g-tpl-200-alt .g-unit {
+  display: block;
+  margin: 0 200px 0 0;
+  width: auto;
+  float: none;
+}
+.g-unit .g-unit .g-tpl-200-alt .g-first,
+.g-unit .g-tpl-200-alt .g-first,
+.g-tpl-200-alt .g-first {
+  display: block;
+  margin: 0;
+  width: 200px;
+  float: right;
+}
+
+/* 190px */
+.g-tpl-190 .g-unit,
+.g-unit .g-tpl-190 .g-unit,
+.g-unit .g-unit .g-tpl-190 .g-unit {
+  display: block;
+  margin: 0 0 0 190px;
+  width: auto;
+  float: none;
+}
+.g-unit .g-unit .g-tpl-190 .g-first,
+.g-unit .g-tpl-190 .g-first,
+.g-tpl-190 .g-first {
+  display: block;
+  margin: 0;
+  width: 190px;
+  float: left;
+}
+/* 190px alt */
+.g-tpl-190-alt .g-unit,
+.g-unit .g-tpl-190-alt .g-unit,
+.g-unit .g-unit .g-tpl-190-alt .g-unit {
+  display: block;
+  margin: 0 190px 0 0;
+  width: auto;
+  float: none;
+}
+.g-unit .g-unit .g-tpl-190-alt .g-first,
+.g-unit .g-tpl-190-alt .g-first,
+.g-tpl-190-alt .g-first {
+  display: block;
+  margin: 0;
+  width: 190px;
+  float: right;
+}
+
 /* 180px */
 .g-tpl-180 .g-unit,
 .g-unit .g-tpl-180 .g-unit,
@@ -1216,7 +1282,7 @@ table.download th {
   float: right;
 }
 
-  
+
 /* JQUERY RESIZABLE STYLES */
 .ui-resizable { position: relative; }
 .ui-resizable-handle { position: absolute; display: none; font-size: 0.1px; z-index:1; }
@@ -1252,7 +1318,7 @@ body .ui-resizable-autohide .ui-resizable-handle { display: none; }
   #body-content {
     position:inherit;
   }
-  
+
   #doc-content {
     margin-left:0 !important;
     height:auto !important;

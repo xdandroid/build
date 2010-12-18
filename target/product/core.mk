@@ -18,16 +18,45 @@ PRODUCT_BRAND := generic
 PRODUCT_DEVICE := generic
 PRODUCT_NAME := core
 
-PRODUCT_POLICY := android.policy_phone
-
 PRODUCT_PROPERTY_OVERRIDES := \
     ro.config.notification_sound=OnTheHunt.ogg \
     ro.config.alarm_alert=Alarm_Classic.ogg
 
 PRODUCT_PACKAGES := \
+    bouncycastle \
+    com.android.location.provider \
+    com.android.location.provider.xml \
+    core \
+    core-junit \
+    create_test_dmtrace \
+    dalvikvm \
+    dexdeps \
+    dexdump \
+    dexlist \
+    dexopt \
+    dmtracedump \
+    dvz \
+    dx \
+    ext \
     framework-res \
+    hprof-conv \
+    icu.dat \
+    jasmin \
+    jasmin.jar \
+    libcrypto \
+    libdex \
+    libdvm \
+    libexpat \
+    libicui18n \
+    libicuuc \
+    libjavacore \
+    libnativehelper \
+    libnfc_ndef \
+    libsqlite_jni \
+    libssl \
+    libz \
+    sqlite-jdbc \
     Browser \
-    CarHomeLauncher \
     Contacts \
     Home \
     HTMLViewer \
@@ -35,6 +64,7 @@ PRODUCT_PACKAGES := \
     ApplicationsProvider \
     ContactsProvider \
     DownloadProvider \
+    DownloadProviderUi \
     MediaProvider \
     PicoTts \
     SettingsProvider \
@@ -46,8 +76,11 @@ PRODUCT_PACKAGES := \
     DefaultContainerService \
     Bugreport
 
-PRODUCT_PROPERTY_OVERRIDES += \
-    media.stagefright.enable-player=true \
-    media.stagefright.enable-meta=true   \
-    media.stagefright.enable-scan=true   \
-    media.stagefright.enable-http=true
+# host-only dependencies
+ifeq ($(WITH_HOST_DALVIK),true)
+    PRODUCT_PACKAGES += \
+        bouncycastle-hostdex \
+        core-hostdex \
+        libjavacore-host
+endif
+

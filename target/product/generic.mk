@@ -19,7 +19,6 @@
 
 PRODUCT_PACKAGES := \
     AccountAndSyncSettings \
-    CarHome \
     DeskClock \
     AlarmProvider \
     Bluetooth \
@@ -39,6 +38,7 @@ PRODUCT_PACKAGES := \
     QuickSearchBox \
     Settings \
     Sync \
+    SystemUI \
     Updater \
     CalendarProvider \
     SyncProvider

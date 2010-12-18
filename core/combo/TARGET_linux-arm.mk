@@ -44,7 +44,7 @@ include $(TARGET_ARCH_SPECIFIC_MAKEFILE)
 # You can set TARGET_TOOLS_PREFIX to get gcc from somewhere else
 ifeq ($(strip $(TARGET_TOOLS_PREFIX)),)
 TARGET_TOOLS_PREFIX := \
-	prebuilt/$(HOST_PREBUILT_TAG)/toolchain/arm-eabi-4.4.0/bin/arm-eabi-
+	prebuilt/$(HOST_PREBUILT_TAG)/toolchain/arm-eabi-4.4.3/bin/arm-eabi-
 endif
 
 TARGET_CC := $(TARGET_TOOLS_PREFIX)gcc$(HOST_EXECUTABLE_SUFFIX)
@@ -97,12 +97,25 @@ TARGET_GLOBAL_CFLAGS += \
 			-ffunction-sections \
 			-funwind-tables \
 			-fstack-protector \
+			-Wa,--noexecstack \
+			-Werror=format-security \
 			-fno-short-enums \
 			$(arch_variant_cflags) \
 			-include $(android_config_h) \
 			-I $(arch_include_dir)
 
+# This is to avoid the dreaded warning compiler message:
+#   note: the mangling of 'va_list' has changed in GCC 4.4
+#
+# The fact that the mangling changed does not affect the NDK ABI
+# very fortunately (since none of the exposed APIs used va_list
+# in their exported C++ functions). Also, GCC 4.5 has already
+# removed the warning from the compiler.
+#
+TARGET_GLOBAL_CFLAGS += -Wno-psabi
+
 TARGET_GLOBAL_LDFLAGS += \
+			-Wl,-z,noexecstack \
 			$(arch_variant_ldflags)
 
 # We only need thumb interworking in cases where thumb support
@@ -198,6 +211,9 @@ TARGET_CRTBEGIN_STATIC_O := $(TARGET_OUT_STATIC_LIBRARIES)/crtbegin_static.o
 TARGET_CRTBEGIN_DYNAMIC_O := $(TARGET_OUT_STATIC_LIBRARIES)/crtbegin_dynamic.o
 TARGET_CRTEND_O := $(TARGET_OUT_STATIC_LIBRARIES)/crtend_android.o
 
+TARGET_CRTBEGIN_SO_O := $(TARGET_OUT_STATIC_LIBRARIES)/crtbegin_so.o
+TARGET_CRTEND_SO_O := $(TARGET_OUT_STATIC_LIBRARIES)/crtend_so.o
+
 TARGET_STRIP_MODULE:=true
 
 TARGET_DEFAULT_SYSTEM_SHARED_LIBRARIES := libc libstdc++ libm
@@ -216,16 +232,18 @@ $(TARGET_CXX) \
 	-Wl,-shared,-Bsymbolic \
 	$(PRIVATE_TARGET_GLOBAL_LD_DIRS) \
 	$(PRIVATE_ALL_OBJECTS) \
+	$(PRIVATE_TARGET_CRTBEGIN_SO_O) \
 	-Wl,--whole-archive \
 	$(call normalize-host-libraries,$(PRIVATE_ALL_WHOLE_STATIC_LIBRARIES)) \
 	-Wl,--no-whole-archive \
 	$(call normalize-target-libraries,$(PRIVATE_ALL_STATIC_LIBRARIES)) \
 	$(call normalize-target-libraries,$(PRIVATE_ALL_SHARED_LIBRARIES)) \
 	-o $@ \
-	$(PRIVATE_LDFLAGS) \
 	$(PRIVATE_TARGET_GLOBAL_LDFLAGS) \
+	$(PRIVATE_LDFLAGS) \
 	$(PRIVATE_TARGET_FDO_LIB) \
-	$(PRIVATE_TARGET_LIBGCC)
+	$(PRIVATE_TARGET_LIBGCC) \
+	$(PRIVATE_TARGET_CRTEND_SO_O)
 endef
 
 define transform-o-to-executable-inner
@@ -240,8 +258,8 @@ $(TARGET_CXX) -nostdlib -Bdynamic -Wl,-T,$(BUILD_SYSTEM)/armelf.x \
 	$(TARGET_CRTBEGIN_DYNAMIC_O) \
 	$(PRIVATE_ALL_OBJECTS) \
 	$(call normalize-target-libraries,$(PRIVATE_ALL_STATIC_LIBRARIES)) \
-	$(PRIVATE_LDFLAGS) \
 	$(TARGET_GLOBAL_LDFLAGS) \
+	$(PRIVATE_LDFLAGS) \
 	$(TARGET_FDO_LIB) \
 	$(TARGET_LIBGCC) \
 	$(TARGET_CRTEND_O)
@@ -253,8 +271,8 @@ $(TARGET_CXX) -nostdlib -Bstatic -Wl,-T,$(BUILD_SYSTEM)/armelf.x \
 	-o $@ \
 	$(TARGET_GLOBAL_LD_DIRS) \
 	$(TARGET_CRTBEGIN_STATIC_O) \
-	$(PRIVATE_LDFLAGS) \
 	$(TARGET_GLOBAL_LDFLAGS) \
+	$(PRIVATE_LDFLAGS) \
 	$(PRIVATE_ALL_OBJECTS) \
 	$(call normalize-target-libraries,$(PRIVATE_ALL_STATIC_LIBRARIES)) \
 	$(TARGET_FDO_LIB) \

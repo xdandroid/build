@@ -16,7 +16,7 @@ include $(BUILD_SYSTEM)/version_defaults.mk
 # people who haven't re-run those will have to do so before they
 # can build.  Make sure to also update the corresponding value in
 # buildspec.mk.default and envsetup.sh.
-CORRECT_BUILD_ENV_SEQUENCE_NUMBER := 9
+CORRECT_BUILD_ENV_SEQUENCE_NUMBER := 10
 
 # ---------------------------------------------------------------
 # The product defaults to generic on hardware and sim on sim
@@ -117,6 +117,17 @@ ifeq ($(HOST_OS),windows)
   HOST_PREBUILT_TAG := windows
 else
   HOST_PREBUILT_TAG := $(HOST_OS)-$(HOST_ARCH)
+endif
+
+# Default to building dalvikvm on hosts that support it...
+ifeq ($(HOST_OS),linux)
+# ... but not if we're building the sim...
+ifneq ($(TARGET_SIMULATOR),true)
+# ... or if the if the option is already set
+ifeq ($(WITH_HOST_DALVIK),)
+	WITH_HOST_DALVIK := true
+endif
+endif
 endif
 
 
@@ -263,7 +274,7 @@ TARGET_INSTALLER_DATA_OUT := $(TARGET_INSTALLER_OUT)/data
 TARGET_INSTALLER_ROOT_OUT := $(TARGET_INSTALLER_OUT)/root
 TARGET_INSTALLER_SYSTEM_OUT := $(TARGET_INSTALLER_OUT)/root/system
 
-COMMON_MODULE_CLASSES := JAVA_LIBRARIES NOTICE_FILES
+COMMON_MODULE_CLASSES := TARGET-NOTICE_FILES HOST-NOTICE_FILES HOST-JAVA_LIBRARIES
 
 ifeq (,$(strip $(DIST_DIR)))
   DIST_DIR := $(OUT_DIR)/dist
@@ -284,7 +295,7 @@ ifeq ($(TARGET_SIMULATOR),true)
 	ABP:=$(ABP):$(TARGET_OUT_EXECUTABLES)
 else
 	# this should be copied to HOST_OUT_EXECUTABLES instead
-	ABP:=$(ABP):$(PWD)/prebuilt/$(HOST_PREBUILT_TAG)/toolchain/arm-eabi-4.4.0/bin
+	ABP:=$(ABP):$(PWD)/prebuilt/$(HOST_PREBUILT_TAG)/toolchain/arm-eabi-4.4.3/bin
 endif
 ANDROID_BUILD_PATHS := $(ABP)
 ANDROID_PREBUILTS := prebuilt/$(HOST_PREBUILT_TAG)

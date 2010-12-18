@@ -35,7 +35,7 @@ ifeq (0,$(shell expr $$(echo $(MAKE_VERSION) | sed "s/[^0-9\.].*//") \>= 3.81))
 $(warning ********************************************************************************)
 $(warning *  You are using version $(MAKE_VERSION) of make.)
 $(warning *  You must upgrade to version 3.81 or greater.)
-$(warning *  see file://$(shell pwd)/docs/development-environment/machine-setup.html)
+$(warning *  see http://source.android.com/download)
 $(warning ********************************************************************************)
 $(error stopping)
 endif
@@ -50,6 +50,10 @@ BUILD_SYSTEM := $(TOPDIR)build/core
 DEFAULT_GOAL := droid
 $(DEFAULT_GOAL):
 
+# Used to force goals to build.  Only use for conditionally defined goals.
+.PHONY: FORCE
+FORCE:
+
 # Set up various standard variables based on configuration
 # and host information.
 include $(BUILD_SYSTEM)/config.mk
@@ -60,11 +64,22 @@ include $(BUILD_SYSTEM)/config.mk
 # be generated correctly
 include $(BUILD_SYSTEM)/cleanbuild.mk
 
-VERSION_CHECK_SEQUENCE_NUMBER := 1
+VERSION_CHECK_SEQUENCE_NUMBER := 2
 -include $(OUT_DIR)/versions_checked.mk
 ifneq ($(VERSION_CHECK_SEQUENCE_NUMBER),$(VERSIONS_CHECKED))
 
 $(info Checking build tools versions...)
+
+ifeq ($(BUILD_OS),linux)
+build_arch := $(shell uname -m)
+ifneq (64,$(findstring 64,$(build_arch)))
+$(warning ************************************************************)
+$(warning You are attempting to build on a 32-bit system.)
+$(warning Only 64-bit build environments are supported beyond froyo/2.2.)
+$(warning ************************************************************)
+$(error stop)
+endif
+endif
 
 ifneq ($(HOST_OS),windows)
 ifneq ($(HOST_OS)-$(HOST_ARCH),darwin-ppc)
@@ -98,18 +113,15 @@ $(error Directory names containing spaces not supported)
 endif
 
 
-# The windows build server currently uses 1.6.  This will be fixed.
-ifneq ($(HOST_OS),windows)
-
 # Check for the correct version of java
-java_version := $(shell java -version 2>&1 | head -n 1 | grep '[ "]1\.5[\. "$$]')
+java_version := $(shell java -version 2>&1 | head -n 1 | grep '[ "]1\.6[\. "$$]')
 ifeq ($(strip $(java_version)),)
 $(info ************************************************************)
 $(info You are attempting to build with the incorrect version)
 $(info of java.)
 $(info $(space))
 $(info Your version is: $(shell java -version 2>&1 | head -n 1).)
-$(info The correct version is: 1.5.)
+$(info The correct version is: 1.6.)
 $(info $(space))
 $(info Please follow the machine setup instructions at)
 $(info $(space)$(space)$(space)$(space)http://source.android.com/download)
@@ -118,22 +130,20 @@ $(error stop)
 endif
 
 # Check for the correct version of javac
-javac_version := $(shell javac -version 2>&1 | head -n 1 | grep '[ "]1\.5[\. "$$]')
+javac_version := $(shell javac -version 2>&1 | head -n 1 | grep '[ "]1\.6[\. "$$]')
 ifeq ($(strip $(javac_version)),)
 $(info ************************************************************)
 $(info You are attempting to build with the incorrect version)
 $(info of javac.)
 $(info $(space))
 $(info Your version is: $(shell javac -version 2>&1 | head -n 1).)
-$(info The correct version is: 1.5.)
+$(info The correct version is: 1.6.)
 $(info $(space))
 $(info Please follow the machine setup instructions at)
 $(info $(space)$(space)$(space)$(space)http://source.android.com/download)
 $(info ************************************************************)
 $(error stop)
 endif
-
-endif # windows
 
 $(shell echo 'VERSIONS_CHECKED := $(VERSION_CHECK_SEQUENCE_NUMBER)' \
         > $(OUT_DIR)/versions_checked.mk)
@@ -146,6 +156,9 @@ INTERNAL_MODIFIER_TARGETS := showcommands checkbuild
 
 # Bring in standard build system definitions.
 include $(BUILD_SYSTEM)/definitions.mk
+
+# Bring in dex_preopt.mk
+include $(BUILD_SYSTEM)/dex_preopt.mk
 
 ifneq ($(filter eng user userdebug tests,$(MAKECMDGOALS)),)
 $(info ***************************************************************)
@@ -207,16 +220,19 @@ ifneq (,$(user_variant))
     # Disable debugging in plain user builds.
     enable_target_debugging :=
   endif
- 
-  # TODO: Always set WITH_DEXPREOPT (for user builds) once it works on OSX.
-  # Also, remove the corresponding block in config/product_config.make.
+
+  # TODO: Remove this and the corresponding block in
+  # config/product_config.make once host-based Dalvik preoptimization is
+  # working.
+  ifneq (true,$(DISABLE_DEXPREOPT))
   ifeq ($(HOST_OS)-$(WITH_DEXPREOPT_buildbot),linux-true)
     WITH_DEXPREOPT := true
   endif
-  
+  endif
+
   # Disallow mock locations by default for user builds
   ADDITIONAL_DEFAULT_PROPERTIES += ro.allow.mock.location=0
-  
+
 else # !user_variant
   # Turn on checkjni for non-user builds.
   ADDITIONAL_BUILD_PROPERTIES += ro.kernel.android.checkjni=1
@@ -267,10 +283,7 @@ ADDITIONAL_BUILD_PROPERTIES += ro.config.nocheckin=yes
 else # !sdk
 endif
 
-# build the full stagefright library
-ifneq ($(strip BUILD_WITH_FULL_STAGEFRIGHT),)
-BUILD_WITH_FULL_STAGEFRIGHT := true
-endif
+BUILD_WITHOUT_PV := true
 
 ## precise GC ##
 
@@ -353,18 +366,21 @@ endif
 # Bring in all modules that need to be built.
 ifneq ($(dont_bother),true)
 
-ifeq ($(HOST_OS),windows)
-SDK_ONLY := true
-endif
 ifeq ($(HOST_OS)-$(HOST_ARCH),darwin-ppc)
+SDK_ONLY := true
+$(info Building the SDK under darwin-ppc is actually obsolete and unsupported.)
+$(error stop)
+endif
+
+ifeq ($(HOST_OS),windows)
 SDK_ONLY := true
 endif
 
 ifeq ($(SDK_ONLY),true)
 
 # ----- SDK for Windows ------
-# These configure the build targets that are available for the SDK under Cygwin.
-# The first section defines all the C/C++ tools that can be compiled under Cygwin,
+# These configure the build targets that are available for the SDK under Windows.
+# The first section defines all the C/C++ tools that can be compiled in C/C++,
 # the second section defines all the Java ones (assuming javac is available.)
 
 subdirs := \
@@ -385,10 +401,7 @@ subdirs := \
 	external/qemu \
 	external/sqlite/dist \
 	external/zlib \
-	frameworks/base/libs/utils \
-	frameworks/base/tools/aapt \
-	frameworks/base/tools/aidl \
-	frameworks/base/opengl/libs \
+	frameworks/base \
 	system/core/adb \
 	system/core/fastboot \
 	system/core/libcutils \
@@ -398,11 +411,10 @@ subdirs := \
 # The following can only be built if "javac" is available.
 # This check is used when building parts of the SDK under Cygwin.
 ifneq (,$(shell which javac 2>/dev/null))
-$(warning sdk-only: javac available.)
 subdirs += \
 	build/tools/signapk \
 	dalvik/dx \
-	dalvik/libcore \
+	libcore \
 	sdk/archquery \
 	sdk/androidprefs \
 	sdk/apkbuilder \
@@ -415,10 +427,9 @@ subdirs += \
 	sdk/layoutopt \
 	development/apps \
 	development/tools/mkstubs \
-	frameworks/base/tools/layoutlib \
 	packages
 else
-$(warning sdk-only: javac not available.)
+$(warning SDK_ONLY: javac not available.)
 endif
 
 # Exclude tools/acp when cross-compiling windows under linux
@@ -687,6 +698,10 @@ droidcore: files \
 	$(INSTALLED_USERDATAIMAGE_TARGET) \
 	$(INSTALLED_FILES_FILE)
 
+ifeq ($(EMMA_INSTRUMENT),true)
+  $(call dist-for-goals, droid, $(EMMA_META_ZIP))
+endif
+
 # dist_libraries only for putting your library into the dist directory with a full build.
 .PHONY: dist_libraries
 
@@ -723,23 +738,13 @@ else # TARGET_BUILD_APPS
     $(INSTALLED_BUILD_PROP_TARGET) \
     $(BUILT_TARGET_FILES_PACKAGE) \
     $(INSTALLED_ANDROID_INFO_TXT_TARGET) \
+    $(INSTALLED_RAMDISK_TARGET) \
    )
-
-  # Tests are installed in userdata.img.  If we're building the tests
-  # variant, copy it for "make tests dist".  Also copy a zip of the
-  # contents of userdata.img, so that people can easily extract a
-  # single .apk.
-  ifeq ($(TARGET_BUILD_VARIANT),tests)
-  $(call dist-for-goals, droid, \
-    $(INSTALLED_USERDATAIMAGE_TARGET) \
-    $(BUILT_TESTS_ZIP_PACKAGE) \
-   )
-  endif
 
 # Building a full system-- the default is to build droidcore
 droid: droidcore dist_libraries
 
-endif # TARGET_BUILD_APPS
+endif
 
 
 .PHONY: droid tests
@@ -764,22 +769,12 @@ $(call dist-for-goals,sdk, \
 findbugs: $(INTERNAL_FINDBUGS_HTML_TARGET) $(INTERNAL_FINDBUGS_XML_TARGET)
 
 .PHONY: clean
-dirs_to_clean := \
-	$(PRODUCT_OUT) \
-	$(TARGET_COMMON_OUT_ROOT) \
-	$(HOST_OUT) \
-	$(HOST_COMMON_OUT_ROOT)
 clean:
-	@for dir in $(dirs_to_clean) ; do \
-	    echo "Cleaning $$dir..."; \
-	    rm -rf $$dir; \
-	done
-	@echo "Clean."; \
-
-.PHONY: clobber
-clobber:
 	@rm -rf $(OUT_DIR)
 	@echo "Entire build directory removed."
+
+.PHONY: clobber
+clobber: clean
 
 # The rules for dataclean and installclean are defined in cleanbuild.mk.
 
@@ -788,7 +783,7 @@ clobber:
 modules:
 	@echo "Available sub-modules:"
 	@echo "$(call module-names-for-tag-list,$(ALL_MODULE_TAGS))" | \
-	      sed -e 's/  */\n/g' | sort -u | $(COLUMN)
+	      tr -s ' ' '\n' | sort -u | $(COLUMN)
 
 .PHONY: showcommands
 showcommands:

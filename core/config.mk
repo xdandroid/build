@@ -31,6 +31,7 @@ SRC_HEADERS := \
 	$(TOPDIR)dalvik/libnativehelper/include \
 	$(TOPDIR)frameworks/base/include \
 	$(TOPDIR)frameworks/base/opengl/include \
+    $(TOPDIR)frameworks/base/native/include \
 	$(TOPDIR)external/skia/include
 SRC_HOST_HEADERS:=$(TOPDIR)tools/include
 SRC_LIBRARIES:= $(TOPDIR)libs
@@ -205,13 +206,17 @@ MKYAFFS2 := $(HOST_OUT_EXECUTABLES)/mkyaffs2image$(HOST_EXECUTABLE_SUFFIX)
 APICHECK := $(HOST_OUT_EXECUTABLES)/apicheck$(HOST_EXECUTABLE_SUFFIX)
 FS_GET_STATS := $(HOST_OUT_EXECUTABLES)/fs_get_stats$(HOST_EXECUTABLE_SUFFIX)
 MKEXT2IMG := $(HOST_OUT_EXECUTABLES)/genext2fs$(HOST_EXECUTABLE_SUFFIX)
+MAKE_EXT4FS := $(HOST_OUT_EXECUTABLES)/make_ext4fs$(HOST_EXECUTABLE_SUFFIX)
+MKEXT2USERIMG := $(HOST_OUT_EXECUTABLES)/mkuserimg.sh
 MKEXT2BOOTIMG := external/genext2fs/mkbootimg_ext2.sh
 MKTARBALL := build/tools/mktarball.sh
 TUNE2FS := tune2fs
 E2FSCK := e2fsck
-JARJAR := java -jar $(HOST_OUT_JAVA_LIBRARIES)/jarjar.jar
+JARJAR := $(HOST_OUT_JAVA_LIBRARIES)/jarjar.jar
 PROGUARD := external/proguard/bin/proguard.sh
 JAVATAGS := build/tools/java-event-log-tags.py
+DEXOPT := $(HOST_OUT_EXECUTABLES)/dexopt$(HOST_EXECUTABLE_SUFFIX)
+DEXPREOPT := dalvik/tools/dex-preopt
 
 # ACP is always for the build OS, not for the host OS
 ACP := $(BUILD_OUT_EXECUTABLES)/acp$(BUILD_EXECUTABLE_SUFFIX)
