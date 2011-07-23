@@ -83,7 +83,12 @@ ifneq ($(words $(BUILD_FINGERPRINT)),1)
 endif
 
 # Display parameters shown under Settings -> About Phone
+# XDAndroid: This allows us to provide release-quality builds with engineering addons.
 ifeq ($(TARGET_BUILD_VARIANT),user)
+  XDANDROID_RELEASE_BUILD := true
+endif
+
+ifeq ($(XDANDROID_RELEASE_BUILD),true)
   # User builds should show:
   # release build number or branch.buld_number non-release builds
 

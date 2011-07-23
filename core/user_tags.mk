@@ -192,6 +192,7 @@ GRANDFATHERED_USER_MODULES += \
 	libc_common \
 	libc_nomalloc \
 	libctest \
+	libCustomWifi \
 	libcutils \
 	libdb \
 	libdbus \
@@ -455,6 +456,7 @@ GRANDFATHERED_USER_MODULES += \
 	test-progress-new \
 	test_swiarb \
 	test_zipfile \
+	tiwlan.ini \
 	toolbox \
 	traceview \
 	tuttle2.kcm \
@@ -464,6 +466,7 @@ GRANDFATHERED_USER_MODULES += \
 	vm-tests \
 	vold \
 	wdsclient \
+	wlan_loader \
 	wpa_supplicant \
 	wpa_supplicant.conf \
 	xmlwriter \
